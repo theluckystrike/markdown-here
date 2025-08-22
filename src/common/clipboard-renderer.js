@@ -144,14 +144,10 @@ ClipboardRenderer.processImagesAsync = async function(html, options) {
     return html;
   }
 
-  console.log('[ClipboardRenderer] Processing images in HTML');
-
   // First, handle math formula placeholders and render them locally
   // Pattern: <img data-math-formula="..." class="math-formula-placeholder">
   const mathPattern = /<img[^>]*data-math-formula="([^"]*)"[^>]*>/g;
   const mathMatches = [...html.matchAll(mathPattern)];
-
-  console.log('[ClipboardRenderer] Found', mathMatches.length, 'math formulas to render locally');
 
   // Process each math formula
   for (const match of mathMatches) {
@@ -162,15 +158,13 @@ ClipboardRenderer.processImagesAsync = async function(html, options) {
     // Check if it's block or inline math
     const isBlock = fullMatch.includes('data-math-display="block"') || fullMatch.includes('tex-block');
 
-    console.log('[ClipboardRenderer] Rendering math formula:', texCode.substring(0, 30) + '...', 'Block:', isBlock);
-
     try {
       // Use local TeX renderer to generate PNG data URI with pre-scaled metrics
       const result = await TexRenderer.renderToDataURI(texCode, isBlock);
 
       // The PNG is already rendered at the scaled size, so use the metrics directly
       // No additional scaling needed - this prevents blurriness!
-      console.log(`[ClipboardRenderer] Using pre-scaled metrics: ${result.heightEx.toFixed(2)}ex × ${result.widthEx.toFixed(2)}ex, baseline: ${result.baselineEx.toFixed(3)}ex`);
+      //console.log(`[ClipboardRenderer] Using pre-scaled metrics: ${result.heightEx.toFixed(2)}ex × ${result.widthEx.toFixed(2)}ex, baseline: ${result.baselineEx.toFixed(3)}ex`);
 
       // Use ex units directly (no calc() needed for single values)
       const newStyle = `height: ${result.heightEx.toFixed(3)}ex; ` +
@@ -185,7 +179,6 @@ ClipboardRenderer.processImagesAsync = async function(html, options) {
         .replace(/style="[^"]*"/, `style="${newStyle}"`)
         .replace(/class="math-formula-placeholder"/, 'class="math-formula-rendered"');
       html = html.replace(fullMatch, newImg);
-      console.log('[ClipboardRenderer] Rendered math formula locally with pre-scaled PNG');
     } catch (e) {
       console.error('[ClipboardRenderer] Failed to render math formula:', e);
       // Leave the placeholder as is
@@ -197,17 +190,13 @@ ClipboardRenderer.processImagesAsync = async function(html, options) {
   tempDiv.innerHTML = html;
   const images = tempDiv.querySelectorAll('img');
 
-  console.log('[ClipboardRenderer] Found', images.length, 'total images, converting external ones to data URIs');
-
   // Convert each external image to data URI
   for (const img of images) {
     if (img.src.startsWith('http')) {
-      console.log('[ClipboardRenderer] Converting external image:', img.src.substring(0, 60) + '...');
       try {
         const dataUri = await ClipboardRenderer.fetchImageAsDataUri(img.src);
         if (dataUri) {
           img.src = dataUri;
-          console.log('[ClipboardRenderer] Converted to data URI');
         }
       } catch (e) {
         console.error('[ClipboardRenderer] Failed to convert image:', e);
@@ -272,17 +261,13 @@ ClipboardRenderer.fetchImageAsDataUri = async function(url) {
  * @returns {Promise<Object|null>} Saved clipboard data or null if unable to read
  */
 ClipboardRenderer.saveClipboard = async function(targetDoc) {
-  console.log('[ClipboardRenderer] Attempting to save clipboard contents...');
-
   // Log focus state for debugging (use provided doc or fallback to global document)
   const doc = targetDoc || document;
-  console.log('[ClipboardRenderer] Document focus:', doc.hasFocus(), 'Active element:', doc.activeElement?.tagName);
 
   // Try full ClipboardItem read (best option - preserves all formats)
   try {
     if (navigator.clipboard && navigator.clipboard.read) {
       const items = await navigator.clipboard.read();
-      console.log('[ClipboardRenderer] ✓ Clipboard saved using read() - found', items.length, 'items');
 
       // Store the items for later restoration
       // We need to extract the data since ClipboardItems can't be reused
@@ -308,7 +293,7 @@ ClipboardRenderer.saveClipboard = async function(targetDoc) {
       }
     }
   } catch (err) {
-    console.warn('[ClipboardRenderer] ⚠️ Cannot read clipboard using read():', err.message);
+    console.warn('[ClipboardRenderer] Cannot read clipboard using read():', err.message);
     console.warn('[ClipboardRenderer] Focus must be in the target document to read clipboard.');
   }
 
@@ -317,16 +302,15 @@ ClipboardRenderer.saveClipboard = async function(targetDoc) {
     if (navigator.clipboard && navigator.clipboard.readText) {
       const text = await navigator.clipboard.readText();
       if (text) {
-        console.log('[ClipboardRenderer] ✓ Clipboard saved using readText() - saved', text.length, 'characters');
         return { type: 'text', data: text };
       }
     }
   } catch (err) {
-    console.warn('[ClipboardRenderer] ⚠️ Cannot read clipboard text:', err.message);
+    console.warn('[ClipboardRenderer] Cannot read clipboard text:', err.message);
     console.warn('[ClipboardRenderer] Focus must be in the target document to read clipboard.');
   }
 
-  console.log('[ClipboardRenderer] ℹ️ Clipboard preservation not available - user clipboard will be replaced');
+  console.log('[ClipboardRenderer] Clipboard preservation not available - user clipboard will be replaced');
   console.log('[ClipboardRenderer] To preserve clipboard, ensure focus is in the target document before rendering.');
   return null;
 };
@@ -343,8 +327,6 @@ ClipboardRenderer.restoreClipboard = async function(saved) {
     return false;
   }
 
-  console.log('[ClipboardRenderer] Attempting to restore clipboard...');
-
   try {
     if (saved.type === 'items') {
       // Restore multi-format clipboard items
@@ -354,16 +336,14 @@ ClipboardRenderer.restoreClipboard = async function(saved) {
         clipboardItems.push(clipboardItem);
       }
       await navigator.clipboard.write(clipboardItems);
-      console.log('[ClipboardRenderer] ✓ Clipboard restored with original items');
       return true;
     } else if (saved.type === 'text') {
       // Restore text-only clipboard
       await navigator.clipboard.writeText(saved.data);
-      console.log('[ClipboardRenderer] ✓ Clipboard restored with original text');
       return true;
     }
   } catch (err) {
-    console.error('[ClipboardRenderer] ❌ Failed to restore clipboard:', err.message);
+    console.error('[ClipboardRenderer] Failed to restore clipboard:', err.message);
     return false;
   }
 
@@ -390,7 +370,7 @@ ClipboardRenderer.copyToClipboard = async function(html) {
     // Write to clipboard
     await navigator.clipboard.write([clipboardItem]);
   } catch (err) {
-    console.error('Failed to copy to clipboard:', err);
+    console.error('[ClipboardRenderer] Failed to copy to clipboard:', err);
     throw err;
   }
 };
@@ -415,7 +395,7 @@ ClipboardRenderer.executePaste = function(targetDoc) {
 
     return result;
   } catch (err) {
-    console.error('Failed to execute paste:', err);
+    console.error('[ClipboardRenderer] Failed to execute paste:', err);
     return false;
   }
 };
@@ -430,8 +410,6 @@ ClipboardRenderer.executePaste = function(targetDoc) {
  * @param {Function} callback - Callback when complete
  */
 ClipboardRenderer.renderViaClipboard = async function(html, range, options, callback) {
-  console.log('[ClipboardRenderer] Starting clipboard-based rendering');
-
   // Check if range is valid
   if (!range || !range.startContainer) {
     console.error('[ClipboardRenderer] Invalid range provided');
@@ -452,11 +430,9 @@ ClipboardRenderer.renderViaClipboard = async function(html, range, options, call
   try {
     // Convert all external images to data URIs
     const processedHtml = await ClipboardRenderer.processImagesAsync(html, options);
-    console.log('[ClipboardRenderer] Processed HTML length:', processedHtml.length);
 
     // Delete the current selection
     range.deleteContents();
-    console.log('[ClipboardRenderer] Deleted selection contents');
 
     // Ensure the target document/element has focus for clipboard operations
     // First try to focus the parent element of the range
@@ -490,22 +466,17 @@ ClipboardRenderer.renderViaClipboard = async function(html, range, options, call
     }
 
     // Now paste the HTML with data URI images
-    console.log('[ClipboardRenderer] Using HTML paste with data URI images');
 
     // Copy the processed HTML to clipboard
     await ClipboardRenderer.copyToClipboard(processedHtml);
-    console.log('[ClipboardRenderer] HTML copied to clipboard');
 
     // Small delay to ensure clipboard is ready
     await new Promise(resolve => setTimeout(resolve, 200));
 
     // Execute paste in a new execution context to avoid "recursive" detection
-    console.log('[ClipboardRenderer] Scheduling paste command...');
     await new Promise(resolve => {
       setTimeout(() => {
-        console.log('[ClipboardRenderer] Executing paste command (deferred)...');
         const result = ClipboardRenderer.executePaste(targetDoc);
-        console.log('[ClipboardRenderer] Paste command result:', result);
         // Note: In Firefox, execCommand('paste') may return false even when it succeeds
         // We don't check the result because the paste usually works regardless
         resolve();
@@ -573,20 +544,12 @@ ClipboardRenderer.monitorPastedImages = function(container) {
 
   const searchContainer = container || document.body;
 
-  console.log('[ClipboardRenderer] Starting immediate image monitoring in:', searchContainer);
-
   // Helper function to check and process an image
   function checkImage(img) {
     // Skip if already processed
     if (processedImages.has(img) || pastedImages.has(img)) {
       return false;
     }
-
-    console.log('[ClipboardRenderer] Checking new image:', {
-      src: img.src.substring(0, 50),
-      alt: img.alt.substring(0, 100),
-      hasJSON: img.alt.includes('{') && img.alt.includes('}')
-    });
 
     // Check if it has JSON-encoded alt (escaped or not)
     let hasJSON = false;
@@ -611,14 +574,11 @@ ClipboardRenderer.monitorPastedImages = function(container) {
 
     if (hasJSON && altData) {
       pastedImages.add(img);
-      console.log('[ClipboardRenderer] Found pasted image with JSON alt');
 
       // If it's already been replaced by Gmail (blob: or cid:)
       if (img.src.startsWith('cid:') || img.src.startsWith('blob:')) {
-        console.log('[ClipboardRenderer] Image already replaced, applying style');
         if (altData.style) {
           img.style.cssText = altData.style;
-          console.log('[ClipboardRenderer] Applied style:', altData.style);
         }
         img.alt = altData.alt || '';
         processedImages.add(img);
@@ -709,7 +669,6 @@ ClipboardRenderer.monitorPastedImages = function(container) {
       clearTimeout(timeoutId);
 
       if (Date.now() - startTime < MAX_TOTAL_WAIT) {
-        console.log('[ClipboardRenderer] Resetting timeout, waiting for more changes');
         timeoutId = setTimeout(cleanup, IDLE_TIMEOUT);
       } else {
         console.log('[ClipboardRenderer] Max wait time reached, cleaning up');
@@ -720,7 +679,6 @@ ClipboardRenderer.monitorPastedImages = function(container) {
 
   function cleanup() {
     observer.disconnect();
-    console.log('[ClipboardRenderer] Stopping image monitoring');
 
     // Clean up any remaining JSON alt attributes (for sites that don't replace)
     let cleanedCount = 0;
@@ -745,10 +703,6 @@ ClipboardRenderer.monitorPastedImages = function(container) {
         }
       }
     });
-
-    if (cleanedCount > 0) {
-      console.log('[ClipboardRenderer] Cleaned up JSON alt on', cleanedCount, 'unprocessed images');
-    }
   }
 
   // Start observing immediately
@@ -761,8 +715,6 @@ ClipboardRenderer.monitorPastedImages = function(container) {
 
   // Initial timeout
   timeoutId = setTimeout(cleanup, IDLE_TIMEOUT);
-
-  console.log('[ClipboardRenderer] Observer started, monitoring for images with JSON alt');
 
   // Return the cleanup function so callers can stop monitoring
   return cleanup;

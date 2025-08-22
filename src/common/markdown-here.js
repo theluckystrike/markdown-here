@@ -527,17 +527,13 @@ function renderMarkdown(focusedElem, selectedRange, markdownRenderer, renderComp
       // Use clipboard rendering (use the correct reference we found earlier)
       clipboardRenderer.renderViaClipboard(mdHtml, selectedRange, options, function(success) {
         if (success) {
-          console.log('[MDH] Clipboard paste succeeded, looking for wrapper...');
-
           // After paste, try to find the wrapper we just inserted
           // We need to look in the focused element for our wrapper
           var wrappers = focusedElem.querySelectorAll('.markdown-here-wrapper');
-          console.log('[MDH] Found', wrappers.length, 'wrapper(s)');
 
           if (wrappers.length > 0) {
             // Get the most recent wrapper (last one)
             wrapper = wrappers[wrappers.length - 1];
-            console.log('[MDH] Setting up mutation observer on wrapper');
 
             // Set up mutation observer
             wrapper.ownerDocument.defaultView.setTimeout(function addMutationObserver() {
@@ -635,21 +631,18 @@ function renderMathFormulas(wrapper) {
   }
 
   const mathImages = wrapper.querySelectorAll('img[data-math-formula]');
-  console.log('[MDH] Found', mathImages.length, 'math formulas to render');
 
   mathImages.forEach(async (img) => {
     const encodedTexCode = img.getAttribute('data-math-formula');
     if (!encodedTexCode) return;
 
     const texCode = decodeURIComponent(encodedTexCode);
-    console.log('[MDH] Rendering math formula:', texCode.substring(0, 30) + '...');
 
     try {
       const pngDataUri = await texRenderer.renderToDataURI(texCode);
       img.src = pngDataUri;
       img.removeAttribute('data-math-formula');
       img.className = img.className.replace('math-formula-placeholder', 'math-formula-rendered');
-      console.log('[MDH] Rendered math formula successfully');
     } catch (e) {
       console.error('[MDH] Failed to render math formula:', e);
     }

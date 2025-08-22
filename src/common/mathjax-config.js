@@ -28,6 +28,7 @@
       typeset: false,  // We'll manually call tex2svg
       pageReady: function() {
         // This runs when MathJax is fully loaded
+        /*
         console.log('[MathJax Config] MathJax is ready');
         console.log('[MathJax Config] Available methods:', {
           tex2svg: typeof MathJax.tex2svg,
@@ -36,10 +37,10 @@
           startup: typeof MathJax.startup,
           version: MathJax.version
         });
+        */
 
         // Check if we need to explicitly set up tex2svg
         if (!MathJax.tex2svg && MathJax.startup && MathJax.startup.input && MathJax.startup.output) {
-          console.log('[MathJax Config] Setting up tex2svg manually...');
           try {
             // Try to create tex2svg function manually
             MathJax.tex2svg = function(tex, options) {
@@ -54,7 +55,6 @@
               // Convert to SVG
               return output.typeset(mathNode, doc);
             };
-            console.log('[MathJax Config] tex2svg function created manually');
           } catch (e) {
             console.error('[MathJax Config] Failed to create tex2svg:', e);
           }
@@ -64,6 +64,4 @@
       }
     }
   };
-
-  console.log('[MathJax Config] Configuration set');
 })();

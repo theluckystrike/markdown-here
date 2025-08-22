@@ -24,7 +24,6 @@ TexRenderer.checkMathJax = function() {
     console.log('[TexRenderer] MathJax not found on window');
     return false;
   }
-  console.log('[TexRenderer] MathJax found, tex2svg available:', !!window.MathJax.tex2svg);
   return true;
 };
 
@@ -33,18 +32,15 @@ TexRenderer.waitForMathJax = function() {
   return new Promise((resolve, reject) => {
     // Check if MathJax is already loaded and ready
     if (window.MathJax && window.MathJax.tex2svg) {
-      console.log('[TexRenderer] MathJax ready with tex2svg');
       resolve();
       return;
     }
 
     // Check if MathJax is loaded but not ready yet
     if (window.MathJax && window.MathJax.startup && window.MathJax.startup.promise) {
-      console.log('[TexRenderer] Waiting for MathJax initialization...');
       window.MathJax.startup.promise.then(() => {
         // After startup, tex2svg should be available
         if (window.MathJax.tex2svg) {
-          console.log('[TexRenderer] MathJax tex2svg ready after initialization');
           resolve();
         } else {
           console.error('[TexRenderer] MathJax loaded but tex2svg not available. Check that mathjax-tex-svg-full.js is properly loaded.');
@@ -59,7 +55,6 @@ TexRenderer.waitForMathJax = function() {
       // Give it a brief moment for tex2svg to be set up
       setTimeout(() => {
         if (window.MathJax.tex2svg) {
-          console.log('[TexRenderer] MathJax tex2svg ready');
           resolve();
         } else {
           console.error('[TexRenderer] MathJax loaded but tex2svg not available. Check that mathjax-tex-svg-full.js is properly loaded.');
@@ -127,7 +122,6 @@ TexRenderer.renderToDataURI = async function(texCode, isBlock) {
       throw new Error('MathJax.tex2svg is not available. Ensure mathjax-tex-svg-full.js is properly loaded.');
     }
 
-    console.log('[TexRenderer] Converting TeX to SVG, display:', !!isBlock);
     const wrapper = MathJax.tex2svg(texCode, {
       display: !!isBlock
     })
@@ -148,12 +142,14 @@ TexRenderer.renderToDataURI = async function(texCode, isBlock) {
     const heightEx = parseFloat(heightAttr) || 0;
     const baselineEx = parseFloat(verticalAlign) || 0;
 
+    /*
     console.log('[TexRenderer] SVG metrics:', {
       widthEx,
       heightEx,
       baselineEx,
       verticalAlign
     });
+    */
 
     // Apply smart scaling BEFORE creating the PNG
     let scaledHeightEx = TexRenderer.smartScaleHeight(heightEx);
@@ -167,7 +163,7 @@ TexRenderer.renderToDataURI = async function(texCode, isBlock) {
     const scaledWidthEx = widthEx * heightRatio;
     const scaledBaselineEx = baselineEx * heightRatio;
 
-    console.log(`[TexRenderer] Smart scaling: ${heightEx.toFixed(2)}ex → ${scaledHeightEx.toFixed(2)}ex (ratio: ${heightRatio.toFixed(2)}x)`);
+    //console.log(`[TexRenderer] Smart scaling: ${heightEx.toFixed(2)}ex → ${scaledHeightEx.toFixed(2)}ex (ratio: ${heightRatio.toFixed(2)}x)`);
 
     // Clone the SVG for manipulation
     const svgClone = svg.cloneNode(true);

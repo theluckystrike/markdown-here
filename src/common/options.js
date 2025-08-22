@@ -38,13 +38,12 @@ function onLoad() {
 
   forgotToRenderCheckEnabled.addEventListener('change', handleForgotToRenderChange, false);
   clipboardRenderingEnabled.addEventListener('change', handleClipboardRenderingChange, false);
-  
+
   // Add immediate save for all checkboxes (except the ones with special handlers)
   const checkboxes = [mathEnable, headerAnchorsEnabled, gfmLineBreaksEnabled];
   checkboxes.forEach(checkbox => {
     if (checkbox) {
       checkbox.addEventListener('change', function() {
-        console.log('[Options] Checkbox changed:', checkbox.id, checkbox.checked);
         // Mark as changed to trigger save
         lastChangeTime = new Date();
       });
@@ -128,15 +127,13 @@ function onLoad() {
       const hasBothPermissions = await chrome.permissions.contains({
         permissions: ['clipboardWrite', 'clipboardRead']
       });
-      
+
       // Only check the box if both the preference is set AND we have both permissions
       clipboardRenderingEnabled.checked = prefs['clipboard-rendering-enabled'] && hasBothPermissions;
-      
+
       if (prefs['clipboard-rendering-enabled'] && !hasBothPermissions) {
         console.log('[Options] clipboard-rendering was enabled but permissions are missing, unchecking');
       }
-      
-      console.log('[Options] Loaded clipboard-rendering-enabled:', clipboardRenderingEnabled.checked);
     } else {
       console.error('[Options] clipboardRenderingEnabled element not found!');
     }
@@ -269,8 +266,7 @@ function checkChange() {
       lastChangeTime = null;
 
       const clipboardValue = clipboardRenderingEnabled ? clipboardRenderingEnabled.checked : false;
-      console.log('[Options] Saving clipboard-rendering-enabled:', clipboardValue);
-      
+
       OptionsStore.set(
         {
           'main-css': cssEdit.value,
@@ -324,7 +320,7 @@ function saveFocusAndFocusIframe() {
   if (!savedFocusElement) {
     savedFocusElement = document.activeElement;
   }
-  
+
   // Focus the iframe to ensure clipboard operations work
   rawMarkdownIframe.contentWindow.focus();
   if (rawMarkdownIframe.contentDocument.body) {
@@ -364,7 +360,7 @@ function renderMarkdown(postRenderCallback) {
 
     function callbackInterceptor(html, css, options) {
       callback(html, css, options);
-      // Note: Focus restoration and postRenderCallback are now handled 
+      // Note: Focus restoration and postRenderCallback are now handled
       // in the renderComplete callback passed to markdownHere above
     }
 
@@ -537,11 +533,11 @@ async function handleForgotToRenderChange(event) {
     : ['https://mail.google.com/'];
 
   const desiredState = event.target.checked;
-  
+
   if (desiredState) {
     // User wants to enable - immediately uncheck while we request permissions
     forgotToRenderCheckEnabled.checked = false;
-    
+
     // We're enabling forgot-to-render, so request permissions
     const granted = await ContentPermissions.requestPermission(origins);
     if (granted) {
@@ -570,19 +566,18 @@ async function handleForgotToRenderChange(event) {
 async function handleClipboardRenderingChange(event) {
   // Store the desired state and immediately revert the checkbox
   const desiredState = event.target.checked;
-  
+
   if (desiredState) {
     // User wants to enable - immediately uncheck while we request permissions
     clipboardRenderingEnabled.checked = false;
-    
+
     // Request BOTH clipboard permissions (both are required for execCommand('paste') to work)
     try {
       const granted = await chrome.permissions.request({
         permissions: ['clipboardWrite', 'clipboardRead']
       });
-      
+
       if (granted) {
-        console.log('[Options] Both clipboard permissions granted');
         // Now actually check the checkbox
         clipboardRenderingEnabled.checked = true;
         // Force the change detection to pick this up
@@ -608,7 +603,7 @@ async function handleClipboardRenderingChange(event) {
     } catch (error) {
       console.error('[Options] Error removing clipboard permissions:', error);
     }
-    
+
     // Force the change detection to pick this up
     lastOptions = ''; // Reset lastOptions to force change detection
     lastChangeTime = new Date();
