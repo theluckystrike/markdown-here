@@ -5,7 +5,7 @@ The _Markdown Here_ browser extension strictly does one thing: Allows users to c
 This means that:
 - It collects no user or usage data.
 - It does not read or modify any part of any site besides the contents of the focused edit control, and only when the user tells it to do so.
-- It makes no external requests at all. All rendering is done locally.
+- It makes no external requests at all. All Markdown rendering is done locally.
 
 ## Optional third-party: LaTeX image rendering service
 

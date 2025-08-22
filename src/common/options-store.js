@@ -18,7 +18,8 @@ const DEFAULTS = {
   // mail.google.com. So the name of this option changed to force that.
   'forgot-to-render-check-enabled-2': false,
   'header-anchors-enabled': false,
-  'gfm-line-breaks-enabled': true
+  'gfm-line-breaks-enabled': true,
+  'clipboard-rendering-enabled': false
 };
 
 /*
@@ -124,7 +125,8 @@ var ChromeOptionsStore = {
     'math-value': DEFAULTS['math-value'],
     'forgot-to-render-check-enabled-2': DEFAULTS['forgot-to-render-check-enabled-2'],
     'header-anchors-enabled': DEFAULTS['header-anchors-enabled'],
-    'gfm-line-breaks-enabled': DEFAULTS['gfm-line-breaks-enabled']
+    'gfm-line-breaks-enabled': DEFAULTS['gfm-line-breaks-enabled'],
+    'clipboard-rendering-enabled': DEFAULTS['clipboard-rendering-enabled']
   },
 
   // Stored string pieces look like: {'key##0': 'the quick ', 'key##1': 'brown fox'}

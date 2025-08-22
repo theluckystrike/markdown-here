@@ -1,6 +1,32 @@
 Change Log
 ==========
 
+2025-08-20: v2.17.1
+-------------------
+
+**MATH FRIENDS THIS RELEASE IS FOR YOU.**
+
+**Local TeX rendering!** Until now we've used external services for TeX rendering, and that hasn't been great: it has privacy and image longevity impacts. We've had conversations over the years about how we might do local rendering, but with no luck... until now!
+
+Here's how it works: **MathJax** is used to convert to SVG; then that's rendered in a canvas and converted to PNG; then that's converted to a data URI and put into the rest of the rendered HTML; then that's **loaded into the clipboard and pasted into the compose element** (this is the key bit, really); then Gmail detects that the paste happened and uploads and attaches them. So we end up with images that are rendered entirely locally and exist entirely in the email content -- **with no third-party external requirements**.
+
+This gives some really great benefits:
+
+- **Privacy**: Rendering is totally local.
+- **Durability**: No third-party service that might get shut down. (Like the Google Charts API we used to use.)
+- **Quality**: Images are a lot crisper. We also can adjust size based on formula complexity. And we can use baseline information to orient them correctly.
+
+But there are also caveats and downsides:
+
+- **Clipboard permissions**: This rendering approach requires that the extension have clipboard reading and writing permissions. This is unfortunate and unavoidable. (And means that our old DOM-injection approach to Markdown rendering will probably remain the default forever.) This permission is only asked for if you enable the feature.
+- **Clipboard clobbering**: Effort is made to restore your clipboard back to its original contents after render-pasting, but sometimes you may find that your clipboard contents have been cleared or replaced.
+- All images get attached to the email, not just TeX math. If you specifically want an image in your email that uses a remote URL... it won't work with this clipboard-rendering approach. All images are inlined.
+
+Oh, also, there's now **block TeX math support with `$$`**. If you enclose your TeX with `$$`, you will get a slightly larger rendering of your formula, and in a block by itself. (Analogous to inline code and code blocks.)
+
+TL;DR: **If you use TeX math, go to the options page and "Enable clipboard-based rendering".** If you have any problems or feedback, comment in [this issue](https://github.com/adam-p/markdown-here/issues/874).
+
+
 2025-07-10: v2.16.0
 -------------------
 
@@ -10,7 +36,7 @@ Change Log
 
     - The hotkey/shortcut key is now managed by the browser instead of the extension (necessitated because we now can't pre-inject into pages). But hotkeys that use `Ctrl` _and_ `Alt` aren't allowed, so... we have a **new default hotkey: `Shift+Alt+M`**. (If you had a custom hotkey, it's been reset to that. Sorry!) You can change the hotkey by going to `chrome://extensions/shortcuts`
 
-    - You'll need to **re-enable the "forgot-to-render" check option**, if you had enabled it. You'll get a prompt allow access to `mail.google.com`. This will allow MDH to pre-inject code that watches for an attempt to send email that you forgot to render.
+    - You'll need to **re-enable the "forgot-to-render" check option**, if you had enabled it. You'll get a prompt to allow access to `mail.google.com`. This will allow MDH to pre-inject code that watches for an attempt to send email that you forgot to render.
 
 * Thanks to everyone who has ever donated! Over the last 12 years there have been about 75 donations. I appreciate the support and encouragement.
 

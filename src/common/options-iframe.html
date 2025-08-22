@@ -11,11 +11,15 @@ MIT License : https://adampritchard.mit-license.org/
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width">
   <script src="vendor/dompurify.min.js"></script>
+  <script src="mathjax-config.js"></script>
+  <script src="vendor/mathjax-tex-svg-full.js"></script>
   <script src="utils.js"></script>
   <script src="common-logic.js"></script>
   <script src="jsHtmlToText.js"></script>
   <script src="marked.js"></script>
   <script src="mdh-html-to-text.js"></script>
+  <script src="tex-renderer.js"></script>
+  <script src="clipboard-renderer.js"></script>
   <script src="markdown-here.js"></script>
   <script src="options-iframe.js"></script>
 
@@ -61,8 +65,24 @@ An image: ![Markdown Here logo](https://raw.githubusercontent.com/adam-p/markdow
 > Block quote.&nbsp; <br>
 > *With* **some** `markdown`.<br>
 <br>
-If **TeX Math** support is enabled, this is the quadratic equation:&nbsp;<br>
-$-b \pm \sqrt{b^2 - 4ac} \over 2a$<br>
+If **TeX Math** support is enabled, this is an inline uppercase sigma: $\Sigma$, and this is the quadratic equation: $-b \pm \sqrt{b^2 - 4ac} \over 2a$<br>
+<br>
+This is a **block of TeX** showing some matrix math:<br>
+$$<br>
+\begin{bmatrix}<br>
+a & b \\<br>
+c & d<br>
+\end{bmatrix}<br>
+\begin{bmatrix}<br>
+x \\<br>
+y<br>
+\end{bmatrix}<br>
+=<br>
+\begin{bmatrix}<br>
+ax + by \\<br>
+cx + dy<br>
+\end{bmatrix}<br>
+$$<br>
 <br>
 # Header 1<br>
 ## Header 2<br>

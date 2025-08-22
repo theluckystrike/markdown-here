@@ -486,6 +486,23 @@ MIT License : https://adampritchard.mit-license.org/
           </button>
         </div>
 
+        <div style="margin-top: 1em; margin-bottom: 1em; border: thick solid orange; padding: 5px;">
+          <input type="checkbox" id="clipboard-rendering-enabled"/>
+          <label for="clipboard-rendering-enabled">
+            <b>Enable clipboard-based rendering (experimental).</b>
+          </label>
+          <div class="extra-description">
+            <p>
+              Uses the clipboard API to paste rendered content instead of direct DOM manipulation.
+              This enables local math formula rendering, improving privacy, durability, and quality.
+              <br><strong>Security Warning:</strong> This feature requires both clipboard read and write permissions. This is required in order to inject the rendered TeX image into the email body.
+              We <em>WILL NOT</em> use these permissions for anything other than rendering content when requested to.
+              <br>If you have any feedback on this feature, please comment in <a href="https://github.com/adam-p/markdown-here/issues/874" target="_blank">this issue</a>.
+              <br><strong>If you don't use TeX math</strong>, then there is no reason to enable this feature.
+            </p>
+          </div>
+        </div>
+
         <div>
           <p>
             <span data-i18n="tex_math_privacy_heading"><strong>Privacy Issues:</strong></span>

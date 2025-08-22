@@ -200,3 +200,14 @@ table tr th {
  font-weight: bold;
   background-color: #F0F0F0;
 }
+
+/* Math formula styles */
+.tex-block {
+  display: block;
+  margin: 1em 0;
+}
+
+.tex-block img {
+  max-width: 100%;
+  height: auto;
+}

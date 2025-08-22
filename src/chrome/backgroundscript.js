@@ -25,11 +25,13 @@ if (!backgroundPage) {
   // present. When loaded via a service worker, we need to import them.
   // (`importScripts` is only available in service workers.)
   importScripts('../common/vendor/dompurify.min.js');
+  // Note: MathJax (mathjax-tex-svg-full.js) is loaded only in content scripts, not service worker
   importScripts('../common/utils.js');
   importScripts('../common/common-logic.js');
   importScripts('../common/marked.js');
   importScripts('../common/highlightjs/highlight.js');
   importScripts('../common/markdown-render.js');
+  // Skip tex-renderer and clipboard-renderer in service worker - they need MathJax
   importScripts('../common/options-store.js');
   importScripts('../common/content-permissions.js');
 }
@@ -122,7 +124,8 @@ chrome.runtime.onMessage.addListener(function(request, sender, responseCallback)
           prefs,
           marked,
           hljs),
-        css: (prefs['main-css'] + prefs['syntax-css'])
+        css: (prefs['main-css'] + prefs['syntax-css']),
+        options: prefs
       });
     });
     return true;
@@ -210,11 +213,15 @@ const Injector = {
   // Scripts to inject in order
   CONTENT_SCRIPTS: [
     '/common/vendor/dompurify.min.js',
+    '/common/mathjax-config.js',
+    '/common/vendor/mathjax-tex-svg-full.js',
     '/common/utils.js',
     '/common/common-logic.js',
     '/common/jsHtmlToText.js',
     '/common/marked.js',
     '/common/mdh-html-to-text.js',
+    '/common/tex-renderer.js',
+    '/common/clipboard-renderer.js',
     '/common/markdown-here.js',
     '/chrome/contentscript.js'
   ],

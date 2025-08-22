@@ -4,6 +4,16 @@
  */
 
 function onLoad() {
+  // Debug what's available in the iframe context
+  console.log('[Options iframe] Available globals:', {
+    ClipboardRenderer: typeof ClipboardRenderer,
+    TexRenderer: typeof TexRenderer,
+    markdownHere: typeof markdownHere,
+    Utils: typeof Utils,
+    window: !!window,
+    navigator: !!navigator
+  });
+  
   // The body of the iframe needs to have a (collapsed) selection range for
   // Markdown Here to work (simulating focus/cursor).
   const range = document.createRange();

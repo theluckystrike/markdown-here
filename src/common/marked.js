@@ -22,6 +22,7 @@ var block = {
   list: /^( *)(bull) [\s\S]+?(?:hr|def|\n{2,}(?! )(?!\1bull )\n*|\s*$)/,
   html: /^ *(?:comment|closed|closing) *(?:\n{2,}|\s*$)/,
   def: /^ *\[([^\]]+)\]: *<?([^\s>]+)>?(?: +["(]([^\n]+)[")])? *(?:\n+|$)/,
+  blockMath: /^\$\$((?:[^\$]|\$(?!\$))+?)\$\$/, /* adam-p: added for block math support */
   table: noop,
   paragraph: /^((?:[^\n]+\n?(?!hr|heading|lheading|blockquote|tag|def))+)\n*/,
   text: /^[^\n]+/
@@ -82,7 +83,8 @@ block.gfm = merge({}, block.normal, {
 block.gfm.paragraph = replace(block.paragraph)
   ('(?!', '(?!'
     + block.gfm.fences.source.replace('\\1', '\\2') + '|'
-    + block.list.source.replace('\\1', '\\3') + '|')
+    + block.list.source.replace('\\1', '\\3') + '|'
+    + block.blockMath.source.replace('\\1', '\\4') + '|')
   ();
 
 /**
@@ -372,6 +374,16 @@ Lexer.prototype.token = function(src, top, bq) {
         href: cap[2],
         title: cap[3]
       };
+      continue;
+    }
+
+    // block math (adam-p: added)
+    if (cap = this.rules.blockMath.exec(src)) {
+      src = src.substring(cap[0].length);
+      this.tokens.push({
+        type: 'blockMath',
+        text: cap[1]
+      });
       continue;
     }
 
@@ -1078,6 +1090,15 @@ Parser.prototype.tok = function() {
         ? this.inline.output(this.token.text)
         : this.token.text;
       return this.renderer.html(html);
+    }
+    case 'blockMath': {
+      /* adam-p: added for block math support */
+      if (this.options.math) {
+        // Wrap in a div for block display
+        return '<div class="tex-block">' + this.options.math(this.token.text, true) + '</div>';
+      }
+      // Fallback: render as escaped text in a div
+      return '<div class="tex-block">$$' + escape(this.token.text) + '$$</div>';
     }
     case 'paragraph': {
       return this.renderer.paragraph(this.inline.output(this.token.text));

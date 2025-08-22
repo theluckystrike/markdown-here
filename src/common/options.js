@@ -12,7 +12,7 @@
  * Main script file for the options page.
  */
 
-let cssEdit, cssSyntaxEdit, cssSyntaxSelect, rawMarkdownIframe, savedMsg, mathEnable, mathEdit, forgotToRenderCheckEnabled, headerAnchorsEnabled, gfmLineBreaksEnabled;
+let cssEdit, cssSyntaxEdit, cssSyntaxSelect, rawMarkdownIframe, savedMsg, mathEnable, mathEdit, forgotToRenderCheckEnabled, headerAnchorsEnabled, gfmLineBreaksEnabled, clipboardRenderingEnabled;
 let loaded = false;
 
 function onLoad() {
@@ -31,11 +31,25 @@ function onLoad() {
   forgotToRenderCheckEnabled = document.getElementById('forgot-to-render-check-enabled');
   headerAnchorsEnabled = document.getElementById('header-anchors-enabled');
   gfmLineBreaksEnabled = document.getElementById('gfm-line-breaks-enabled');
+  clipboardRenderingEnabled = document.getElementById('clipboard-rendering-enabled');
 
   rawMarkdownIframe.addEventListener('load', () => renderMarkdown());
   rawMarkdownIframe.src = Utils.getLocalURL('/common/options-iframe.html');
 
-  forgotToRenderCheckEnabled.addEventListener('click', handleForgotToRenderChange, false);
+  forgotToRenderCheckEnabled.addEventListener('change', handleForgotToRenderChange, false);
+  clipboardRenderingEnabled.addEventListener('change', handleClipboardRenderingChange, false);
+  
+  // Add immediate save for all checkboxes (except the ones with special handlers)
+  const checkboxes = [mathEnable, headerAnchorsEnabled, gfmLineBreaksEnabled];
+  checkboxes.forEach(checkbox => {
+    if (checkbox) {
+      checkbox.addEventListener('change', function() {
+        console.log('[Options] Checkbox changed:', checkbox.id, checkbox.checked);
+        // Mark as changed to trigger save
+        lastChangeTime = new Date();
+      });
+    }
+  });
 
   document.getElementById('extensions-shortcut-link').addEventListener('click', function(event) {
     event.preventDefault();
@@ -84,11 +98,18 @@ function onLoad() {
     });
 
   //
+  // Check current clipboard permissions
+  chrome.permissions.contains({
+    permissions: ['clipboardWrite', 'clipboardRead']
+  }, function(result) {
+    console.log('[Options] Current clipboard permissions:', result);
+  });
+
   // Restore previously set options (asynchronously)
   //
 
   var optionsGetSuccessful = false;
-  OptionsStore.get(function(prefs) {
+  OptionsStore.get(async function(prefs) {
     cssEdit.value = prefs['main-css'];
     cssSyntaxEdit.value = prefs['syntax-css'];
 
@@ -100,6 +121,25 @@ function onLoad() {
     headerAnchorsEnabled.checked = prefs['header-anchors-enabled'];
 
     gfmLineBreaksEnabled.checked = prefs['gfm-line-breaks-enabled'];
+
+    // Check actual permissions and sync with saved preferences
+    if (clipboardRenderingEnabled) {
+      // Check if we have BOTH clipboard permissions (both are required for paste to work)
+      const hasBothPermissions = await chrome.permissions.contains({
+        permissions: ['clipboardWrite', 'clipboardRead']
+      });
+      
+      // Only check the box if both the preference is set AND we have both permissions
+      clipboardRenderingEnabled.checked = prefs['clipboard-rendering-enabled'] && hasBothPermissions;
+      
+      if (prefs['clipboard-rendering-enabled'] && !hasBothPermissions) {
+        console.log('[Options] clipboard-rendering was enabled but permissions are missing, unchecking');
+      }
+      
+      console.log('[Options] Loaded clipboard-rendering-enabled:', clipboardRenderingEnabled.checked);
+    } else {
+      console.error('[Options] clipboardRenderingEnabled element not found!');
+    }
 
     // Start watching for changes to the styles.
     setInterval(checkChange, 100);
@@ -211,7 +251,7 @@ function checkChange() {
         cssEdit.value + cssSyntaxEdit.value +
         mathEnable.checked + mathEdit.value +
         forgotToRenderCheckEnabled.checked + headerAnchorsEnabled.checked +
-        gfmLineBreaksEnabled.checked;
+        gfmLineBreaksEnabled.checked + clipboardRenderingEnabled.checked;
 
   if (newOptions !== lastOptions) {
     // CSS has changed.
@@ -228,6 +268,9 @@ function checkChange() {
       // Sufficient time has passed since the last change -- time to save.
       lastChangeTime = null;
 
+      const clipboardValue = clipboardRenderingEnabled ? clipboardRenderingEnabled.checked : false;
+      console.log('[Options] Saving clipboard-rendering-enabled:', clipboardValue);
+      
       OptionsStore.set(
         {
           'main-css': cssEdit.value,
@@ -236,7 +279,8 @@ function checkChange() {
           'math-value': mathEdit.value,
           'forgot-to-render-check-enabled-2': forgotToRenderCheckEnabled.checked,
           'header-anchors-enabled': headerAnchorsEnabled.checked,
-          'gfm-line-breaks-enabled': gfmLineBreaksEnabled.checked
+          'gfm-line-breaks-enabled': gfmLineBreaksEnabled.checked,
+          'clipboard-rendering-enabled': clipboardValue
         },
         function() {
           updateMarkdownRender();
@@ -268,8 +312,31 @@ function requestMarkdownConversion(elem, range, callback) {
     { action: 'render', mdText: mdhHtmlToText.get() },
     function(response) {
       var renderedMarkdown = mdhHtmlToText.postprocess(response.html);
-      callback(renderedMarkdown, response.css);
+      callback(renderedMarkdown, response.css, response.options);
     });
+}
+
+// Focus management for iframe rendering
+let savedFocusElement = null;
+
+function saveFocusAndFocusIframe() {
+  // Save current focus if not already saved
+  if (!savedFocusElement) {
+    savedFocusElement = document.activeElement;
+  }
+  
+  // Focus the iframe to ensure clipboard operations work
+  rawMarkdownIframe.contentWindow.focus();
+  if (rawMarkdownIframe.contentDocument.body) {
+    rawMarkdownIframe.contentDocument.body.focus();
+  }
+}
+
+function restoreSavedFocus() {
+  if (savedFocusElement && savedFocusElement.focus) {
+    savedFocusElement.focus();
+    savedFocusElement = null;
+  }
 }
 
 // Render the sample Markdown.
@@ -280,8 +347,14 @@ function renderMarkdown(postRenderCallback) {
     return;
   }
 
-  // Begin rendering.
-  markdownHere(rawMarkdownIframe.contentDocument, requestMarkdownConversionInterceptor);
+  saveFocusAndFocusIframe();
+
+  // Begin rendering. Pass a renderComplete callback to restore focus after rendering
+  markdownHere(rawMarkdownIframe.contentDocument, requestMarkdownConversionInterceptor, null, function() {
+    // This gets called after rendering is actually complete (including clipboard operations)
+    restoreSavedFocus();
+    if (postRenderCallback) postRenderCallback();
+  });
 
   // To figure out when the (asynchronous) rendering is complete -- so we
   // can call the `postRenderCallback` -- we'll intercept the callback used
@@ -289,11 +362,10 @@ function renderMarkdown(postRenderCallback) {
 
   function requestMarkdownConversionInterceptor(elem, range, callback) {
 
-    function callbackInterceptor() {
-      callback.apply(null, arguments);
-
-      // Rendering done. Call callback.
-      if (postRenderCallback) postRenderCallback();
+    function callbackInterceptor(html, css, options) {
+      callback(html, css, options);
+      // Note: Focus restoration and postRenderCallback are now handled 
+      // in the renderComplete callback passed to markdownHere above
     }
 
     // Call the real rendering service.
@@ -310,6 +382,8 @@ function updateMarkdownRender() {
 
   // To mitigate flickering, hide the iframe during rendering.
   rawMarkdownIframe.style.visibility = 'hidden';
+
+  saveFocusAndFocusIframe();
 
   // Unrender
   markdownHere(rawMarkdownIframe.contentDocument, requestMarkdownConversion);
@@ -462,13 +536,23 @@ async function handleForgotToRenderChange(event) {
     ? ['chrome://messenger/content/messengercompose/*'] // TODO: figure out if this is right -- it's probably not an "origin"
     : ['https://mail.google.com/'];
 
-  if (event.target.checked) {
+  const desiredState = event.target.checked;
+  
+  if (desiredState) {
+    // User wants to enable - immediately uncheck while we request permissions
+    forgotToRenderCheckEnabled.checked = false;
+    
     // We're enabling forgot-to-render, so request permissions
     const granted = await ContentPermissions.requestPermission(origins);
-    if (!granted) {
-      // Permission denied - uncheck the checkbox
-      forgotToRenderCheckEnabled.checked = false;
-      // checkChange will pick up this change and save it
+    if (granted) {
+      // Now actually check the checkbox
+      forgotToRenderCheckEnabled.checked = true;
+      // Force the change detection to pick this up
+      lastOptions = ''; // Reset lastOptions to force change detection
+      lastChangeTime = new Date();
+    } else {
+      // Permission denied - keep the checkbox unchecked (already is)
+      console.log('[Options] Forgot-to-render permission denied');
     }
   } else {
     // User is disabling forgot-to-render - remove permissions
@@ -476,5 +560,58 @@ async function handleForgotToRenderChange(event) {
     if (!removed) {
       console.error('Failed to remove permissions');
     }
+    // Force the change detection to pick this up
+    lastOptions = ''; // Reset lastOptions to force change detection
+    lastChangeTime = new Date();
   }
 }
+
+// Handle clipboard rendering checkbox changes
+async function handleClipboardRenderingChange(event) {
+  // Store the desired state and immediately revert the checkbox
+  const desiredState = event.target.checked;
+  
+  if (desiredState) {
+    // User wants to enable - immediately uncheck while we request permissions
+    clipboardRenderingEnabled.checked = false;
+    
+    // Request BOTH clipboard permissions (both are required for execCommand('paste') to work)
+    try {
+      const granted = await chrome.permissions.request({
+        permissions: ['clipboardWrite', 'clipboardRead']
+      });
+      
+      if (granted) {
+        console.log('[Options] Both clipboard permissions granted');
+        // Now actually check the checkbox
+        clipboardRenderingEnabled.checked = true;
+        // Force the change detection to pick this up
+        lastOptions = ''; // Reset lastOptions to force change detection
+        lastChangeTime = new Date();
+      } else {
+        console.log('[Options] Clipboard permissions denied');
+        // Keep the checkbox unchecked (already is)
+        alert('Both clipboard read and write permissions are required for clipboard-based rendering to work properly. This allows the extension to save and restore your clipboard contents during rendering. Please try again and grant both permissions when prompted.');
+      }
+    } catch (error) {
+      console.error('[Options] Error requesting clipboard permissions:', error);
+      // Keep the checkbox unchecked (already is)
+    }
+  } else {
+    // User wants to disable - let it happen immediately
+    // Remove both permissions if they were granted
+    try {
+      await chrome.permissions.remove({
+        permissions: ['clipboardWrite', 'clipboardRead']
+      });
+      console.log('[Options] Removed clipboard permissions');
+    } catch (error) {
+      console.error('[Options] Error removing clipboard permissions:', error);
+    }
+    
+    // Force the change detection to pick this up
+    lastOptions = ''; // Reset lastOptions to force change detection
+    lastChangeTime = new Date();
+  }
+}
+

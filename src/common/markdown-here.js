@@ -467,7 +467,7 @@ function renderMarkdown(focusedElem, selectedRange, markdownRenderer, renderComp
   var originalHtml = Utils.getDocumentFragmentHTML(selectedRange.cloneContents());
 
   // Call to the extension main code to actually do the md->html conversion.
-  markdownRenderer(focusedElem, selectedRange, function(mdHtml, mdCss) {
+  markdownRenderer(focusedElem, selectedRange, function(mdHtml, mdCss, options) {
     var wrapper, rawHolder;
 
     // Store the original Markdown-in-HTML to the `title` attribute of a separate,
@@ -489,30 +489,105 @@ function renderMarkdown(focusedElem, selectedRange, markdownRenderer, renderComp
         rawHolder +
       '</div>';
 
-    wrapper = replaceRange(selectedRange, mdHtml);
+    // Get the window context where we're rendering (could be iframe)
+    const targetWindow = focusedElem.ownerDocument.defaultView;
 
-    // Some webmail (Gmail) strips off any external style block. So we need to go
-    // through our styles, explicitly applying them to matching elements.
-    makeStylesExplicit(wrapper, mdCss);
+    // Check if clipboard rendering is enabled and supported
+    // Need to check for ClipboardRenderer in the target window's context
+    const clipboardRendererAvailable = (typeof ClipboardRenderer !== 'undefined') ||
+                                       (targetWindow && targetWindow.ClipboardRenderer);
+    const clipboardRenderer = clipboardRendererAvailable ?
+                             (typeof ClipboardRenderer !== 'undefined' ? ClipboardRenderer : targetWindow.ClipboardRenderer) :
+                             null;
 
-    // Monitor for changes to the content of the rendered MD. This will help us
-    // prevent the user from silently losing changes later.
-    // We're going to set this up after a short timeout, to help prevent false
-    // detections based on automatic changes by the host site.
-    wrapper.ownerDocument.defaultView.setTimeout(function addMutationObserver() {
-      var SupportedMutationObserver =
-            wrapper.ownerDocument.defaultView.MutationObserver ||
-            wrapper.ownerDocument.defaultView.WebKitMutationObserver;
-      if (typeof(SupportedMutationObserver) !== 'undefined') {
-        var observer = new SupportedMutationObserver(function(mutations) {
-          wrapper.setAttribute('markdown-here-wrapper-content-modified', true);
-          observer.disconnect();
-        });
-        observer.observe(wrapper, { childList: true, characterData: true, subtree: true });
-      }
-    }, 100);
+    if (options && options['clipboard-rendering-enabled'] &&
+        clipboardRenderer &&
+        clipboardRenderer.isSupported()) {
 
-    renderComplete();
+      // For clipboard rendering, we need to apply styles inline
+      // Create a temporary container in the actual document
+      var tempContainer = focusedElem.ownerDocument.createElement('div');
+      tempContainer.style.position = 'absolute';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.visibility = 'hidden';
+      focusedElem.ownerDocument.body.appendChild(tempContainer);
+
+      // Add the HTML to the container
+      Utils.saferSetInnerHTML(tempContainer, mdHtml);
+
+      // Apply styles explicitly
+      makeStylesExplicit(tempContainer.firstChild, mdCss);
+
+      // Get the HTML with inline styles
+      mdHtml = tempContainer.innerHTML;
+
+      // Remove the temporary container
+      focusedElem.ownerDocument.body.removeChild(tempContainer);
+
+      // Use clipboard rendering (use the correct reference we found earlier)
+      clipboardRenderer.renderViaClipboard(mdHtml, selectedRange, options, function(success) {
+        if (success) {
+          console.log('[MDH] Clipboard paste succeeded, looking for wrapper...');
+
+          // After paste, try to find the wrapper we just inserted
+          // We need to look in the focused element for our wrapper
+          var wrappers = focusedElem.querySelectorAll('.markdown-here-wrapper');
+          console.log('[MDH] Found', wrappers.length, 'wrapper(s)');
+
+          if (wrappers.length > 0) {
+            // Get the most recent wrapper (last one)
+            wrapper = wrappers[wrappers.length - 1];
+            console.log('[MDH] Setting up mutation observer on wrapper');
+
+            // Set up mutation observer
+            wrapper.ownerDocument.defaultView.setTimeout(function addMutationObserver() {
+              var SupportedMutationObserver =
+                    wrapper.ownerDocument.defaultView.MutationObserver ||
+                    wrapper.ownerDocument.defaultView.WebKitMutationObserver;
+              if (typeof(SupportedMutationObserver) !== 'undefined') {
+                var observer = new SupportedMutationObserver(function(mutations) {
+                  wrapper.setAttribute('markdown-here-wrapper-content-modified', true);
+                  observer.disconnect();
+                });
+                observer.observe(wrapper, { childList: true, characterData: true, subtree: true });
+              }
+            }, 100);
+          }
+        } else {
+          console.log('[MDH] Clipboard paste failed');
+        }
+        renderComplete();
+      });
+    } else {
+      // Use traditional DOM manipulation rendering
+      wrapper = replaceRange(selectedRange, mdHtml);
+
+      // Some webmail (Gmail) strips off any external style block. So we need to go
+      // through our styles, explicitly applying them to matching elements.
+      makeStylesExplicit(wrapper, mdCss);
+
+      // Process math formulas if they exist
+      renderMathFormulas(wrapper);
+
+      // Monitor for changes to the content of the rendered MD. This will help us
+      // prevent the user from silently losing changes later.
+      // We're going to set this up after a short timeout, to help prevent false
+      // detections based on automatic changes by the host site.
+      wrapper.ownerDocument.defaultView.setTimeout(function addMutationObserver() {
+        var SupportedMutationObserver =
+              wrapper.ownerDocument.defaultView.MutationObserver ||
+              wrapper.ownerDocument.defaultView.WebKitMutationObserver;
+        if (typeof(SupportedMutationObserver) !== 'undefined') {
+          var observer = new SupportedMutationObserver(function(mutations) {
+            wrapper.setAttribute('markdown-here-wrapper-content-modified', true);
+            observer.disconnect();
+          });
+          observer.observe(wrapper, { childList: true, characterData: true, subtree: true });
+        }
+      }, 100);
+
+      renderComplete();
+    }
   });
 }
 
@@ -532,6 +607,53 @@ function unrenderMarkdown(wrapperElem) {
   originalMdHtml = Utils.base64ToUTF8String(originalMdHtml);
 
   Utils.saferSetOuterHTML(wrapperElem, originalMdHtml);
+}
+
+// Process math formula placeholders in the DOM
+function renderMathFormulas(wrapper) {
+  // Get the window context where we're rendering (could be iframe)
+  const targetWindow = wrapper.ownerDocument.defaultView;
+
+  // Check for TexRenderer in both current context and target window
+  const texRenderer = (typeof TexRenderer !== 'undefined') ? TexRenderer :
+                      (targetWindow && targetWindow.TexRenderer) ? targetWindow.TexRenderer :
+                      null;
+
+  if (!texRenderer || !texRenderer.renderToDataURI) {
+    console.log('[MDH] TexRenderer not available, skipping math rendering');
+    return;
+  }
+
+  // Check for MathJax in both contexts
+  const mathJax = (typeof window !== 'undefined' && window.MathJax) ? window.MathJax :
+                  (targetWindow && targetWindow.MathJax) ? targetWindow.MathJax :
+                  null;
+
+  if (!mathJax) {
+    console.log('[MDH] MathJax not loaded, skipping math rendering');
+    return;
+  }
+
+  const mathImages = wrapper.querySelectorAll('img[data-math-formula]');
+  console.log('[MDH] Found', mathImages.length, 'math formulas to render');
+
+  mathImages.forEach(async (img) => {
+    const encodedTexCode = img.getAttribute('data-math-formula');
+    if (!encodedTexCode) return;
+
+    const texCode = decodeURIComponent(encodedTexCode);
+    console.log('[MDH] Rendering math formula:', texCode.substring(0, 30) + '...');
+
+    try {
+      const pngDataUri = await texRenderer.renderToDataURI(texCode);
+      img.src = pngDataUri;
+      img.removeAttribute('data-math-formula');
+      img.className = img.className.replace('math-formula-placeholder', 'math-formula-rendered');
+      console.log('[MDH] Rendered math formula successfully');
+    } catch (e) {
+      console.error('[MDH] Failed to render math formula:', e);
+    }
+  });
 }
 
 // Exported function.

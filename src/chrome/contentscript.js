@@ -63,7 +63,7 @@ function requestMarkdownConversion(elem, range, callback) {
     { action: 'render', mdText: mdhHtmlToText.get() },
     function(response) {
       var renderedMarkdown = mdhHtmlToText.postprocess(response.html);
-      callback(renderedMarkdown, response.css);
+      callback(renderedMarkdown, response.css, response.options);
     });
 }
 

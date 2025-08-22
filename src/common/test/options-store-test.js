@@ -143,6 +143,133 @@ describe('OptionsStore', function() {
     });
   });
 
+  // Test new clipboard-rendering-enabled option
+  describe('clipboard-rendering-enabled option', function() {
+    var clipboardKey = 'clipboard-rendering-enabled';
+    var userOriginalValue = undefined;
+    
+    // Save user's original value before running tests
+    before(function(done) {
+      OptionsStore.get(function(options) {
+        // Store whatever value the user has (undefined if never set, false by default, or true if enabled)
+        userOriginalValue = options[clipboardKey];
+        done();
+      });
+    });
+    
+    // Restore user's original value after all tests complete
+    after(function(done) {
+      // Always restore the user's original value
+      var obj = {};
+      obj[clipboardKey] = userOriginalValue;
+      OptionsStore.set(obj, function() {
+        done();
+      });
+    });
+
+    it('should set and get clipboard-rendering-enabled', function(done) {
+      var obj = {};
+      obj[clipboardKey] = true;
+
+      OptionsStore.set(obj, function() {
+        OptionsStore.get(function(options) {
+          expect(options[clipboardKey]).to.equal(true);
+          done();
+        });
+      });
+    });
+
+    it('should persist clipboard-rendering-enabled across get calls', function(done) {
+      var obj = {};
+      obj[clipboardKey] = true;
+
+      OptionsStore.set(obj, function() {
+        // First get
+        OptionsStore.get(function(options1) {
+          expect(options1[clipboardKey]).to.equal(true);
+          
+          // Second get to ensure persistence
+          OptionsStore.get(function(options2) {
+            expect(options2[clipboardKey]).to.equal(true);
+            done();
+          });
+        });
+      });
+    });
+
+    it('should handle toggling clipboard-rendering-enabled', function(done) {
+      var obj = {};
+      
+      // Set to true
+      obj[clipboardKey] = true;
+      OptionsStore.set(obj, function() {
+        OptionsStore.get(function(options) {
+          expect(options[clipboardKey]).to.equal(true);
+          
+          // Toggle to false
+          obj[clipboardKey] = false;
+          OptionsStore.set(obj, function() {
+            OptionsStore.get(function(options2) {
+              expect(options2[clipboardKey]).to.equal(false);
+              done();
+            });
+          });
+        });
+      });
+    });
+
+
+    it('should handle clipboard-rendering-enabled with other options', function(done) {
+      // Save original values first
+      var originalValues = {};
+      var testKeys = ['clipboard-rendering-enabled', 'forgot-to-render-check-enabled-2', 'header-anchors-enabled', 'gfm-line-breaks-enabled'];
+      
+      OptionsStore.get(function(originalOptions) {
+        // Store original values (might be undefined if not set)
+        testKeys.forEach(function(key) {
+          originalValues[key] = originalOptions[key];
+        });
+        
+        // Now run the test with test values
+        var obj = {
+          'clipboard-rendering-enabled': true,
+          'forgot-to-render-check-enabled-2': true,
+          'header-anchors-enabled': true,
+          'gfm-line-breaks-enabled': false
+        };
+
+        OptionsStore.set(obj, function() {
+          OptionsStore.get(function(options) {
+            expect(options['clipboard-rendering-enabled']).to.equal(true);
+            expect(options['forgot-to-render-check-enabled-2']).to.equal(true);
+            expect(options['header-anchors-enabled']).to.equal(true);
+            expect(options['gfm-line-breaks-enabled']).to.equal(false);
+            
+            // Restore original values instead of removing
+            // Only set keys that had original values
+            var restoreObj = {};
+            testKeys.forEach(function(key) {
+              if (originalValues[key] !== undefined) {
+                restoreObj[key] = originalValues[key];
+              }
+            });
+            
+            if (Object.keys(restoreObj).length > 0) {
+              OptionsStore.set(restoreObj, function() {
+                done();
+              });
+            } else {
+              // If there were no original values, remove the test values
+              OptionsStore.remove(testKeys, function() {
+                done();
+              });
+            }
+          });
+        });
+      });
+    });
+  });
+
   it('should set and get multiple values', function(done) {
     OptionsStore.get(function(options) {
       expect(options).to.not.have.property(testKeys[0]);
